@@ -1,6 +1,8 @@
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
+from BCDetector import BCDetector
+
 key = bytes.fromhex("964d3bf6aaafe958b3a36bd33a48d5ae")
 iv = bytes.fromhex("964d3bf6aaafe958b3a36bd33a48d5ae")  # not recommended
 
@@ -19,3 +21,6 @@ def check_stream(data):
 
 
 if __name__ == "__main__":
+    detector = BCDetector()
+    detector.analyse_string()
+    pass
