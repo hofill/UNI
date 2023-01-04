@@ -21,12 +21,5 @@ class BCDetector:
 
     def analyse_string(self):
         self.state.check_combo_no_plaintext(
-            (b"caca", b"cacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacaca"))
-        self.state.check_combo_no_plaintext((b"caca", b"cacacacacacacaca"))
-        self.state.check_combo_no_plaintext(
-            (None, b"cacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacaca"))
-        self.state.check_combo_no_plaintext(
-            (b"caca", b"cacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacaca"))
-        self.state.check_combo_no_plaintext(
-            (b"caca", b"cacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacaca"))
+            (None, b"cacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacaca"))
         pass

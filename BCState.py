@@ -14,7 +14,6 @@ class BCState:
         iv, blocks = combo
 
         blocks = list(utils.chunks(blocks, utils.BLOCK_SIZE))
-        print(blocks)
 
         # Calculate the probability that the blocks were encrypted using each mode
         probabilities = utils.default_probabilities
@@ -36,6 +35,9 @@ class BCState:
             probabilities['OFB'] += .33
         else:
             probabilities['CBC'] += .7
+            probabilities['CFB'] = .1
+            probabilities['CTR'] = .1
+            probabilities['OFB'] = .1
 
         self.__certainty.normalize(probabilities)
 
