@@ -6,9 +6,27 @@ class BCState:
     def __init__(self):
         self.__certainty = Certainty()
         self.__modified = False
+        self.__category = None  # ECB, CBC, ECB_CBC or Stream
+        self.__past_combos = []
+
+    def add_combo(self, combo: (bytes, bytes), plaintext: str):
+        self.__past_combos.append((combo, plaintext))
 
     def check_combo(self, combo: (bytes, bytes), plaintext: str):
-        pass
+        if self.__category is None:
+            # Try to determine the category
+            self.check_ecb(combo)
+
+    def check_ecb(self, combo):
+        if len(self.__past_combos) == 1:
+            # If there is only one combo, we can't confidently determine the category, but we can make a guess
+            if combo[0] is None:
+                # If the combo has no IV, it is likely ECB
+                self.__category = 'ECB'
+            else if combo[0] is not None:
+                # If the combo has an IV, it is likely CBC
+                self.__category = 'CBC'
+            return
 
     def check_combo_no_plaintext(self, combo: (bytes, bytes)):
         iv, blocks = combo
@@ -47,3 +65,9 @@ class BCState:
 
     def is_modified(self):
         return self.__modified
+
+    def __check_block_size(self):
+        pass
+
+    def check_ecb(self):
+        pass

@@ -5,19 +5,18 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
 KEY = os.urandom(16)
-IV = os.urandom(16)
 BLOCK_SIZE = 16
 
 
 def encrypt_data():
-    aes = AES.new(KEY, AES.MODE_CBC, iv=IV)
+    aes = AES.new(KEY, AES.MODE_ECB)
     data = pad(bytes.fromhex(input("Data (HEX): ").strip()), BLOCK_SIZE)
     encrypted = aes.encrypt(data)
     print(encrypted.hex())
 
 
 def decrypt_data():
-    aes = AES.new(KEY, AES.MODE_CBC, iv=IV)
+    aes = AES.new(KEY, AES.MODE_ECB)
     data = bytes.fromhex(input("Data (HEX): ").strip())
     print(unpad(aes.decrypt(data), BLOCK_SIZE).hex())
 

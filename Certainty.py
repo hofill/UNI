@@ -39,6 +39,12 @@ class Certainty:
         self.__round += 1
 
     def normalize(self, probabilities: dict):
+        """
+        Normalizes the probabilities and adds them to the current certainty
+
+        :param probabilities: The list of probabilities to add
+        :return: None
+        """
         total = sum(probabilities.values())
         for key in self.__certainty:
             self.__certainty[key] += probabilities[key] / total

@@ -1,26 +1,30 @@
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
-
-from BCDetector import BCDetector
-
-key = bytes.fromhex("964d3bf6aaafe958b3a36bd33a48d5ae")
-iv = bytes.fromhex("964d3bf6aaafe958b3a36bd33a48d5ae")  # not recommended
-
-BLOCK_SIZE = 16
-m = b"bob and alice are together now"
+from BCDetector import BCDetector, BadPaddingException
+from pwn import *
 
 
-def check_stream(data):
-    certainty = 0
-    if data[0] is None:
-        certainty += 0.3
-    l = len(data[1]) / BLOCK_SIZE
-    if l == int(l):
-        certainty += 0.7
-    return certainty
+class Det(BCDetector):
+    def decrypt(self, data, server: process):
+        server.clean(0.1)
+        server.sendline(b"2")
+        server.sendline(data.hex().encode())
+        answer = server.readline().strip()
+        if b"Padding is incorrect." in answer:
+            return BadPaddingException
+        else:
+            return answer
+
+    def encrypt(self, data, server: process):
+        server.recvuntil("> ")
+        server.sendline(b"1")
+        server.sendline(data.hex().encode())
+        return server.readline().strip().split(b": ")[1].decode()
+
+    def init_server(self):
+        r = process(["./test_servers/cbc.py"])
+        return r
 
 
 if __name__ == "__main__":
-    detector = BCDetector()
-    detector.analyse_string()
+    detector = Det()
+    detector.begin()
     pass
