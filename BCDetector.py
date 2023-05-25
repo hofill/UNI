@@ -26,9 +26,11 @@ class BCDetector:
         self.max_retries = int(kwargs.get('max_retries', 3))
         self.save_to_file = bool(kwargs.get('save_to_file', False))
         self.server = bool(kwargs.get('server', False))
-        self.state = BCState()
-        self.attempts = 0
-        self.history = []
+        self.__attempts = 0
+        self.__history = []
+        self.__state = BCState()
+        self.__padding_method = None  # "Block", "Block+", "No Padding"
+        self.__server = None
 
     def encrypt(self, data, server):
         """
@@ -66,20 +68,51 @@ class BCDetector:
         :return: None
         """
         try:
-            server = self.init_server()
+            self.__server = self.init_server()
         except NotImplementedError:
             print("ERROR: init_server method not implemented")
             return None
         # Check 3 base encrypted strings to determine ECB, CBC, ECB_CBC or Stream
-        l_1 = convert_to_bytes(self.encrypt(b"\x00" * 15, server))
-        l_2 = convert_to_bytes(self.encrypt(b"\x00" * 32, server))
-        l_3 = convert_to_bytes(self.encrypt(b"\x00" * 33, server))
-        self.analyse_string(l_1)
-        self.analyse_string(l_2)
-        self.analyse_string(l_3)
+        self.initial_cryptanalysis()
 
-    def analyse_string(self, data, plaintext=None, iv=None):
-        if plaintext is not None:
-            self.state.check_combo((iv, data), plaintext)
-        else:
-            self.state.check_combo_no_plaintext((iv, data))
+    def check_block_size(self):
+        """
+        Checks the block size of the cipher using many encryption combos
+
+        :return:
+        """
+        p_1 = b"\x00" * 1
+        c_1 = convert_to_bytes(self.encrypt(p_1, self.__server))
+        if self.__state.check_block_size(c_1, p_1):
+            return
+        p_2 = b"\x00" * 16
+        c_2 = convert_to_bytes(self.encrypt(p_2, self.__server))
+        if self.__state.check_block_size(c_2, p_2):
+            return
+        # Begin heavy check
+
+
+
+
+    def initial_cryptanalysis(self):
+        """
+        This method will be called exactly once and will:
+        1. Determine the padding method
+        2. Determine the block size
+        3. Determine the category of block cipher used (ECB, CBC, ECB_CBC, Stream)
+
+        :return: None
+        """
+        self.check_block_size()
+
+        p_2 = b"\x00" * 32
+        c_2 = convert_to_bytes(self.encrypt(p_2, self.__server))
+        p_3 = b"\x00" * 33
+        c_3 = convert_to_bytes(self.encrypt(p_3, self.__server))
+
+# def analyse_string(self, data, plaintext=None):
+#
+#     if plaintext is not None:
+#         self.state.check_combo((iv, data), plaintext)
+#     else:
+#         self.state.check_combo_no_plaintext((iv, data))

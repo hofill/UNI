@@ -13,12 +13,12 @@ def encrypt_data():
     aes = AES.new(KEY, AES.MODE_CBC, iv=IV)
     data = pad(bytes.fromhex(input("Data (HEX): ").strip()), BLOCK_SIZE)
     encrypted = aes.encrypt(data)
-    print(encrypted.hex())
+    print(IV.hex() + encrypted.hex())
 
 
 def decrypt_data():
     aes = AES.new(KEY, AES.MODE_CBC, iv=IV)
-    data = bytes.fromhex(input("Data (HEX): ").strip())
+    data = bytes.fromhex(input("Data (HEX): ").strip()[32:])
     print(unpad(aes.decrypt(data), BLOCK_SIZE).hex())
 
 
