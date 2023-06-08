@@ -1,11 +1,5 @@
 from BCState import BCState
-from utils import convert_to_bytes
-
-
-class BadPaddingException(Exception):
-    """
-    Raised when the padding is incorrect
-    """
+from exceptions import BlockSizeUnidentifiableException
 
 
 class BCDetector:
@@ -29,6 +23,9 @@ class BCDetector:
         self.__attempts = 0
         self.__history = []
         self.__state = BCState()
+        if not self.server:
+            self.__state.initialize_no_server()
+
         self.__padding_method = None  # "Block", "Block+", "No Padding"
         self.__server_instance = None
 
@@ -80,41 +77,84 @@ class BCDetector:
             print("ERROR: init_server method not implemented")
             return None
         # Check 3 base encrypted strings to determine ECB, CBC, ECB_CBC or Stream
-        self.initial_cryptanalysis()
+        self.analyze()
 
     def check_block_size(self):
         """
         Checks the block size of the cipher using many encryption combos
 
-        :return:
+        :return: None
         """
-        p_1 = b"\x00" * 1
-        c_1 = convert_to_bytes(self.encrypt(p_1, self.__server_instance))
-        if self.__state.check_block_size(c_1, p_1):
-            return
-        p_2 = b"\x00" * 16
-        c_2 = convert_to_bytes(self.encrypt(p_2, self.__server_instance))
-        if self.__state.check_block_size(c_2, p_2):
-            return
-        # Begin heavy check
-        self.__state.check_block_size_heavy(self.encrypt)
+        max_attempts = 129
+        to_encrypt = b''
+        while max_attempts:
+            to_encrypt += b'\x00'
+            encrypted_data = self.encrypt(to_encrypt.hex(), self.__server_instance)
+            try:
+                if not self.__state.add_block_size_check(len(to_encrypt), encrypted_data):
+                    break
+            except BlockSizeUnidentifiableException:
+                raise BlockSizeUnidentifiableException("Could not determine block size")
+            max_attempts -= 1
+        if max_attempts == 0:
+            raise BlockSizeUnidentifiableException("Could not determine block size")
+        else:
+            return self.__state.get_block_size()
 
+    def check_block_cipher_mode(self):
+        # Get Category
+        category = self.__state.get_block_cipher_mode_category()
 
-    def initial_cryptanalysis(self):
+        if category == "ECB_CBC":
+            # Check ECB
+            block_size = self.__state.get_block_size()
+            to_encrypt = b'\x00' * block_size * 3
+            encrypted_data = self.encrypt(to_encrypt.hex(), self.__server_instance)
+            self.__state.add_combo(encrypted_data, to_encrypt)
+            if self.__state.get_block_cipher_mode() == "ECB":
+                print(f"[X] Found block cipher mode: {self.__state.get_block_cipher_mode()}")
+                return
+            elif self.__state.get_block_cipher_mode() == "CBC":
+                print(f"[X] Found block cipher mode: {self.__state.get_block_cipher_mode()}")
+                return
+            else:
+                print(f"[ERROR] Could not determine block cipher mode")
+                return
+        else:
+            pass
+
+    def check_padding_method(self):
+        pass
+
+    def analyze(self):
         """
         This method will be called exactly once and will:
-        1. Determine the padding method
-        2. Determine the block size
-        3. Determine the category of block cipher used (ECB, CBC, ECB_CBC, Stream)
+        1. Determine the block size
+        2. Determine the category of block cipher used (ECB, CBC, ECB_CBC, Stream)
+        3. Attempt to determine the block cipher mode used
+        4. Determine the padding method
 
         :return: None
         """
-        self.check_block_size()
+        print(f"[INFO] Starting initial cryptanalysis")
+        print(f"[INFO] Determining block size")
+        try:
+            print(f"[X] Found block size: {self.check_block_size()}")
+        except BlockSizeUnidentifiableException as e:
+            print(f"[ERROR] Could not determine block size: {e}")
+            return
+        print(f"[INFO] Determining block cipher category")
+        if self.__state.get_block_cipher_mode_category():
+            print(f"[X] Found block cipher category: {self.__state.get_block_cipher_mode_category()}")
+        else:
+            print(f"[ERROR] Could not determine block cipher category")
+            return
+        print(f"[INFO] Starting fingerprinting")
+        print(f"[INFO] Determining block cipher mode")
+        self.check_block_cipher_mode()
 
-        p_2 = b"\x00" * 32
-        c_2 = convert_to_bytes(self.encrypt(p_2, self.__server))
-        p_3 = b"\x00" * 33
-        c_3 = convert_to_bytes(self.encrypt(p_3, self.__server))
+        # print(f"[INFO] Determining padding method")
+        # self.__padding_method = self.check_padding_method()
 
 # def analyse_string(self, data, plaintext=None):
 #

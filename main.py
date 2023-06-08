@@ -1,5 +1,9 @@
-from BCDetector import BCDetector, BadPaddingException
+from BCDetector import BCDetector
 from pwn import *
+
+from exceptions import BadPaddingException
+
+context.log_level = 'critical'
 
 
 class Det(BCDetector):
@@ -17,13 +21,13 @@ class Det(BCDetector):
             return answer
 
     def encrypt(self, data, server: process):
-        server.recvuntil("> ")
+        server.recvuntil(b"> ")
         server.sendline(b"1")
-        server.sendline(data.hex().encode())
+        server.sendline(data.encode())
         return server.readline().strip().split(b": ")[1].decode()
 
     def init_server(self):
-        r = process(["./test_servers/cbc.py"])
+        r = process(["./test_servers/ecb.py"])
         return r
 
 

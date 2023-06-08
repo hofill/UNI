@@ -8,9 +8,16 @@ KEY = os.urandom(16)
 BLOCK_SIZE = 16
 
 
+def common_pad(pt, block_size):
+    if len(pt) % block_size == 0:
+        return pt
+    else:
+        return pt + b"\x00" * (16 - len(pt) % 16)
+
+
 def encrypt_data():
     aes = AES.new(KEY, AES.MODE_ECB)
-    data = pad(bytes.fromhex(input("Data (HEX): ").strip()), BLOCK_SIZE)
+    data = common_pad(bytes.fromhex(input("Data (HEX): ").strip()), BLOCK_SIZE)
     encrypted = aes.encrypt(data)
     print(encrypted.hex())
 

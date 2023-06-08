@@ -23,7 +23,6 @@ def decrypt_data():
 
 
 if __name__ == "__main__":
-
     functions = {
         "1": encrypt_data,
         "2": decrypt_data
