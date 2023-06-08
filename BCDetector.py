@@ -30,15 +30,15 @@ class BCDetector:
         self.__history = []
         self.__state = BCState()
         self.__padding_method = None  # "Block", "Block+", "No Padding"
-        self.__server = None
+        self.__server_instance = None
 
     def encrypt(self, data, server):
         """
         Unimplemented method that should encrypt the data using the server.
 
-        :param data: The data to encrypt, as bytes
+        :param data: The data to encrypt, as hex
         :param server: The server to use
-        :return: The encrypted data as bytes (decoded from hex) or a string (hex or base64)
+        :return: The encrypted data as bytes
         """
         raise NotImplementedError
 
@@ -46,13 +46,20 @@ class BCDetector:
         """
         Unimplemented method that should decrypt the data using the server.
 
-        :param data: The data to decrypt, as bytes
+        :param data: The data to decrypt, as hex
         :param server: The server to use
-        :return: The decrypted data as bytes (decoded from hex) or a string (hex or base64)
+
+        :return: The decrypted data as bytes
         """
         raise NotImplementedError
 
     def init_server(self):
+        """
+        Unimplemented method that should return a process object that is used to
+        communicate with the server.
+
+        :return: A process object
+        """
         raise NotImplementedError
 
     def begin(self):
@@ -68,7 +75,7 @@ class BCDetector:
         :return: None
         """
         try:
-            self.__server = self.init_server()
+            self.__server_instance = self.init_server()
         except NotImplementedError:
             print("ERROR: init_server method not implemented")
             return None
@@ -82,16 +89,15 @@ class BCDetector:
         :return:
         """
         p_1 = b"\x00" * 1
-        c_1 = convert_to_bytes(self.encrypt(p_1, self.__server))
+        c_1 = convert_to_bytes(self.encrypt(p_1, self.__server_instance))
         if self.__state.check_block_size(c_1, p_1):
             return
         p_2 = b"\x00" * 16
-        c_2 = convert_to_bytes(self.encrypt(p_2, self.__server))
+        c_2 = convert_to_bytes(self.encrypt(p_2, self.__server_instance))
         if self.__state.check_block_size(c_2, p_2):
             return
         # Begin heavy check
-
-
+        self.__state.check_block_size_heavy(self.encrypt)
 
 
     def initial_cryptanalysis(self):

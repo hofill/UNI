@@ -3,6 +3,9 @@ from pwn import *
 
 
 class Det(BCDetector):
+    def __init__(self):
+        super().__init__(max_retries=3, save_to_file=True, server=True)
+
     def decrypt(self, data, server: process):
         server.clean(0.1)
         server.sendline(b"2")

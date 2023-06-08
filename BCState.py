@@ -7,12 +7,21 @@ class BCState:
     """
 
     def __init__(self):
+        """
+        Initialises the state
+
+        step - The step of the detector:
+        0: Detecting the block size
+        1: Detecting the padding method
+        2: Detecting the block cipher mode
+        """
         self.__certainty = Certainty()
         self.__modified = False
         self.__category = None  # ECB, CBC, ECB_CBC or Stream
         self.__block_size = None
         self.__provides_iv = False
         self.__past_combos = []
+        self.__step = 0
 
     def add_combo(self, combo: (bytes, bytes), plaintext: str):
         self.__past_combos.append((combo, plaintext))
@@ -82,5 +91,5 @@ class BCState:
                 return False
             return False
 
-    def check_block_size_heavy(self, ciphertext, plaintext):
-        pass
+    def check_block_size_heavy(self, encrypt_method):
+        encrypt_method()

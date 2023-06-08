@@ -40,16 +40,3 @@ def calculate_color(amt):
         return Color.GREEN
     else:
         return Color.GREEN + Color.BOLD
-
-def convert_to_bytes(data):
-    if type(data) == str:
-        # detect if string is hex
-        if len(data) % 2 == 0 and all(c in string.hexdigits for c in data):
-            return bytes.fromhex(data)
-        # else if data is base64
-        elif len(data) % 4 == 0 and all(c in string.ascii_letters + string.digits + "+/=" for c in data):
-            return base64.b64decode(data)
-    elif type(data) == bytes:
-        return data
-    else:
-        raise TypeError("Data must be either a string or bytes")
