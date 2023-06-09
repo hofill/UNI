@@ -1,5 +1,5 @@
 from BCState import BCState
-from exceptions import BlockSizeUnidentifiableException
+from exceptions import *
 
 
 class BCDetector:
@@ -36,17 +36,6 @@ class BCDetector:
         :param data: The data to encrypt, as hex
         :param server: The server to use
         :return: The encrypted data as bytes
-        """
-        raise NotImplementedError
-
-    def decrypt(self, data, server):
-        """
-        Unimplemented method that should decrypt the data using the server.
-
-        :param data: The data to decrypt, as hex
-        :param server: The server to use
-
-        :return: The decrypted data as bytes
         """
         raise NotImplementedError
 
@@ -109,22 +98,38 @@ class BCDetector:
             # Check ECB
             block_size = self.__state.get_block_size()
             to_encrypt = b'\x00' * block_size * 3
-            encrypted_data = self.encrypt(to_encrypt.hex(), self.__server_instance)
+            encrypted_data = bytes.fromhex(self.encrypt(to_encrypt.hex(), self.__server_instance))
             self.__state.add_combo(encrypted_data, to_encrypt)
-            if self.__state.get_block_cipher_mode() == "ECB":
-                print(f"[X] Found block cipher mode: {self.__state.get_block_cipher_mode()}")
-                return
-            elif self.__state.get_block_cipher_mode() == "CBC":
-                print(f"[X] Found block cipher mode: {self.__state.get_block_cipher_mode()}")
-                return
+            if self.__state.get_block_cipher_mode() == "ECB" or self.__state.get_block_cipher_mode() == "CBC":
+                return self.__state.get_block_cipher_mode()
             else:
-                print(f"[ERROR] Could not determine block cipher mode")
-                return
+                raise BlockCipherModeUnidentifiableException("Could not determine block cipher mode")
         else:
-            pass
+            to_encrypt = b'\x00'
+            encrypted_data = bytes.fromhex(self.encrypt(to_encrypt.hex(), self.__server_instance))
+            self.__state.add_combo(encrypted_data, to_encrypt)
+            return self.__state.get_block_cipher_mode()
 
     def check_padding_method(self):
-        pass
+        """
+        Checks the padding method of the cipher using many encryption combos
+
+        :return: The padding method, None if not found/not applicable
+        """
+        # Get Category
+        category = self.__state.get_block_cipher_mode_category()
+
+        # Get Block Cipher Mode
+        block_cipher_mode = self.__state.get_block_cipher_mode()
+
+        # Get Block Size
+        block_size = self.__state.get_block_size()
+
+        if not self.__state.check_padding_method_determinable(self.encrypt, self.__server_instance):
+            return None
+
+        self.__state.check_padding(self.encrypt, self.__server_instance)
+        return self.__state.get_padding_method()
 
     def analyze(self):
         """
@@ -136,29 +141,33 @@ class BCDetector:
 
         :return: None
         """
-        print(f"[INFO] Starting initial cryptanalysis")
-        print(f"[INFO] Determining block size")
+        print(f"[INFO] Starting initial cryptanalysis.")
+        print(f"[INFO] Determining block size.")
         try:
-            print(f"[X] Found block size: {self.check_block_size()}")
+            print(f"[X] Found block size: {self.check_block_size()}.")
         except BlockSizeUnidentifiableException as e:
-            print(f"[ERROR] Could not determine block size: {e}")
+            print(f"[ERROR] Could not determine block size: {e}.")
             return
-        print(f"[INFO] Determining block cipher category")
+        print(f"[INFO] Determining block cipher category.")
         if self.__state.get_block_cipher_mode_category():
-            print(f"[X] Found block cipher category: {self.__state.get_block_cipher_mode_category()}")
+            print(f"[X] Found block cipher category: {self.__state.get_block_cipher_mode_category()}.")
         else:
-            print(f"[ERROR] Could not determine block cipher category")
+            print(f"[ERROR] Could not determine block cipher category.")
             return
-        print(f"[INFO] Starting fingerprinting")
-        print(f"[INFO] Determining block cipher mode")
-        self.check_block_cipher_mode()
-
-        # print(f"[INFO] Determining padding method")
-        # self.__padding_method = self.check_padding_method()
-
-# def analyse_string(self, data, plaintext=None):
-#
-#     if plaintext is not None:
-#         self.state.check_combo((iv, data), plaintext)
-#     else:
-#         self.state.check_combo_no_plaintext((iv, data))
+        print(f"[INFO] Starting fingerprinting.")
+        print(f"[INFO] Determining block cipher mode.")
+        detected = self.check_block_cipher_mode()
+        if detected:
+            print(f"[X] Found block cipher mode: {detected}.")
+        else:
+            print(f"[INFO] Could not determine block cipher mode, providing a list of probable modes.")
+        self.__state.get_certainty().print_certainty()
+        if not (detected == "ECB" or detected == "CBC"):
+            print(f"[INFO] Block cipher mode is not ECB or CBC, skipping padding method detection.")
+            return
+        print(f"[INFO] ECB/CBC detected. Determining padding method.")
+        detected = self.check_padding_method()
+        if detected:
+            print(f"[X] Found padding method: {detected}.")
+        else:
+            print(f"[INFO] Could not determine padding method.")

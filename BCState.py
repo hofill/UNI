@@ -1,5 +1,5 @@
 from Certainty import Certainty
-from exceptions import BlockSizeUnidentifiableException
+from exceptions import *
 
 
 class BCState:
@@ -10,15 +10,10 @@ class BCState:
     def __init__(self):
         """
         Initialises the state
-
-        step - The step of the detector:
-        0: Detecting the block size
-        1: Detecting the padding method
-        2: Detecting the block cipher mode
         """
         self.__certainty = Certainty()
         self.__category = None  # ECB, CBC, ECB_CBC or Stream
-        self.__detected_block_cipher_mode = None  # ECB, CBC, CFB, OFB and CTR
+        self.__detected_block_cipher_mode = None  # ECB, CBC, CFB, OFB or CTR
 
         self.__block_size = None
         self.__block_size_combo_history = []
@@ -26,34 +21,109 @@ class BCState:
         self.__padding_method = None  # PKCS7, None, Block, Block+
         self.__padding_method_combo_history = []
 
-        self.__provides_iv = False
+        self.__provides_iv = None
         self.__past_combos = []
-        self.__step = 0
 
     def initialize_no_server(self):
         self.__block_size = 16
         self.__padding_method = 'PKCS7'
 
-    def add_combo(self, combo: str, plaintext: str):
-        self.__past_combos.append((combo, plaintext))
+    def add_combo(self, ciphertext: bytes, plaintext: bytes):
+        """
+        Adds a combo to the state, and analyses them to determine the block cipher mode.
 
-    def check_combo(self, combo: (bytes, bytes), plaintext: str):
-        if self.__category is None:
-            # Try to determine the category
-            self.check_ecb(combo)
+        :param ciphertext: The ciphertext
+        :param plaintext: The plaintext
+        :return: True if the block cipher mode is determined
+        """
+        self.__past_combos.append((ciphertext, plaintext))
+        if self.__category == "ECB_CBC":
+            self.check_category_block(ciphertext)
+            if self.__certainty.has_certain_mode():
+                return True
+        elif self.__category == "Stream":
+            self.check_category_steam(ciphertext, plaintext)
+            if self.__certainty.has_certain_mode():
+                return True
+        elif self.__category is None:
+            raise CategoryNotDeterminedException("Category not determined")
+        else:
+            self.__certainty.certain(self.__category)
 
-    def check_ecb(self, combo: (bytes, bytes)):
-        if len(self.__past_combos) == 1:
-            # If there is only one combo, we can't confidently determine the category, but we can make a guess
-            if combo[0] is None:
-                # If the combo has no IV, it is likely ECB
-                self.__category = 'ECB'
-            elif combo[0] is not None:
-                # If the combo has an IV, it is likely CBC
-                self.__category = 'CBC'
-            return
+    def check_category_block(self, ciphertext):
+        """
+        Determines the block ciphers modes of operation by checking aspects specific to block ciphers like ECB and CBC
 
-    def check_combo_no_plaintext(self, combo: (bytes, bytes)):
+        :param ciphertext: The ciphertext to check
+        :return: None
+        """
+        has_identical_blocks = self.check_identical_blocks(ciphertext)
+        if has_identical_blocks:
+            self.__certainty.certain("ECB")
+            self.__detected_block_cipher_mode = "ECB"
+        else:
+            self.__certainty.certain("CBC")
+            self.__detected_block_cipher_mode = "CBC"
+
+    def check_category_steam(self, ciphertext: bytes, plaintext: bytes):
+        """
+        Determines the block ciphers modes of operation by checking aspects specific to stream ciphers like CFB, OFB and CTR
+
+        :param ciphertext: The ciphertext to check
+        :param plaintext: The plaintext to check
+        :return: None
+        """
+        if len(ciphertext) > len(plaintext):
+            self.__provides_iv = True
+            if len(ciphertext) >= len(plaintext) + 16:
+                probabilities = {
+                    "ECB": 0,
+                    "CBC": 0,
+                    "CFB": 75,
+                    "OFB": 75,
+                    "CTR": 25,
+                }
+                self.__certainty.normalize(probabilities)
+            else:
+                probabilities = {
+                    "ECB": 0,
+                    "CBC": 0,
+                    "CFB": 5,
+                    "OFB": 5,
+                    "CTR": 95,
+                }
+                self.__certainty.normalize(probabilities)
+        elif len(ciphertext) == len(plaintext):
+            self.__provides_iv = False
+            probabilities = {
+                "ECB": 0,
+                "CBC": 0,
+                "CFB": 33.33,
+                "OFB": 33.33,
+                "CTR": 33.33,
+            }
+            self.__certainty.normalize(probabilities)
+        else:
+            raise Exception("Ciphertext is shorter than plaintext")
+
+    def check_identical_blocks(self, ciphertext):
+        """
+        Iterates through the ciphertext and checks if there are any repeating blocks
+
+        :param ciphertext: The ciphertext to check
+        :return: True if there are repeating blocks, False if there are not
+        """
+        if len(ciphertext) % self.__block_size != 0:
+            return False
+
+        # Check if the ciphertext has any repeating blocks
+        for i in range(0, len(ciphertext), self.__block_size):
+            block = ciphertext[i:i + self.__block_size]
+            if ciphertext.count(block) > 1:
+                return True
+        return False
+
+    def add_combo_no_plaintext(self, ciphertext: bytes):
         pass
 
     def add_block_size_check(self, plaintext_length, ciphertext):
@@ -74,13 +144,13 @@ class BCState:
         old_ciphertext = previous_combo[1]
         if len(ciphertext) == len(old_ciphertext):
             return True
-        elif len(ciphertext) + 1 == len(old_ciphertext):
+        elif len(ciphertext) == len(old_ciphertext) + 1:
             # The block size is 1
             self.__block_size = 1
             self.__category = 'Stream'
             self.__padding_method = 'None'
             return False
-        elif len(ciphertext) + 1 > len(old_ciphertext):
+        elif len(ciphertext) > len(old_ciphertext) + 1:
             # The block size is the difference between the two lengths
             self.__block_size = len(ciphertext) - len(old_ciphertext)
             self.__category = 'ECB_CBC'
@@ -88,36 +158,48 @@ class BCState:
         else:
             raise BlockSizeUnidentifiableException("The block size is not findable")
 
-    def check_padding(self, plaintext, ciphertext):
+    def check_padding(self, encrypt_method, instance):
         """
         Checks the padding method of the cipher using many encryption/decryption combos
 
         :param plaintext: The plaintext that was encrypted to get the ciphertext
         :param ciphertext: The ciphertext
-        :return: True if more checks are needed, False if the padding method has been determined
+        :return: None
         """
+        if self.__padding_method is not None:
+            return
+
         if self.__block_size is None:
-            return False
+            return
 
         if self.__block_size == 1:
             self.__padding_method = 'None'
-            return True
+            return
 
-        if self.__padding_method is not None:
-            return False
-        self.__padding_method_combo_history.append((plaintext, ciphertext))
-        if len(self.__padding_method_combo_history) == 1:
-            return True
+        to_encrypt = b'\x10' * (self.__block_size - 1)
+        ciphertext_full_minus_one = bytes.fromhex(encrypt_method(to_encrypt.hex(), instance))
+        ciphertext_full = bytes.fromhex(encrypt_method((to_encrypt + b'\x10').hex(), instance))
+        if len(ciphertext_full) - len(ciphertext_full_minus_one) == self.__block_size:
+            self.__padding_method = 'Block+'
+        else:
+            self.__padding_method = 'Block'
+            return
 
-        # Compare the new ciphertext to the old ciphertext
-        previous_combo = self.__padding_method_combo_history[len(self.__padding_method_combo_history) - 2]
-        old_plaintext = previous_combo[0]
-        old_ciphertext = previous_combo[1]
+        if self.__padding_method == 'Block+' and self.__detected_block_cipher_mode == 'ECB':
+            # get last block and second to last block
+            last_block = ciphertext_full[-self.__block_size:]
+            second_to_last_block = ciphertext_full[-(self.__block_size * 2):-(self.__block_size)]
+            if last_block == second_to_last_block:
+                self.__padding_method = 'PKCS7'
+                return
+            return
 
-    def check_padding_method_determinable(self, encrypt_method):
+    def check_padding_method_determinable(self, encrypt_method, instance):
         """
         Checks if the padding method can be determined
 
+        :param encrypt_method: The encryption method to use
+        :param instance: The server instance to use
         :return: True if the padding method can be determined, False otherwise
         """
         # The padding method can be determined if
@@ -127,12 +209,13 @@ class BCState:
         # size
 
         if self.__block_size is None:
-            return True
+            return False
 
         to_encrypt = b'A' * (self.__block_size - 1)
-        ciphertext_full_minus_one = bytes.fromhex(encrypt_method(to_encrypt.hex()))
-        ciphertext_full = bytes.fromhex(encrypt_method((to_encrypt + b'A').hex()))
-        if len(ciphertext_full) == len(ciphertext_full_minus_one):
+        ciphertext_full_minus_one = bytes.fromhex(encrypt_method(to_encrypt.hex(), instance))
+        ciphertext_full = bytes.fromhex(encrypt_method((to_encrypt + b'A').hex(), instance))
+        ciphertext_full_plus_one = bytes.fromhex(encrypt_method((to_encrypt + b'AA').hex(), instance))
+        if len(ciphertext_full) == len(ciphertext_full_minus_one) == len(ciphertext_full_plus_one):
             return False
         else:
             return True
@@ -148,3 +231,6 @@ class BCState:
 
     def get_block_cipher_mode(self):
         return self.__detected_block_cipher_mode
+
+    def get_certainty(self):
+        return self.__certainty

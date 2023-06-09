@@ -50,4 +50,25 @@ class Certainty:
             self.__certainty[key] += probabilities[key] / total
         total = sum(self.__certainty.values())
         self.__certainty = {key: value / total for key, value in self.__certainty.items()}
-        self.print_certainty()
+
+    def add_certainty(self, mode: str, amount: float):
+        """
+        Adds certainty to a block cipher mode
+
+        :param mode: The block cipher mode to add certainty to
+        :param amount: The amount of certainty to add
+        :return: None
+        """
+        self.__certainty[mode] += amount
+
+    def certain(self, mode: str):
+        self.__certainty[mode] = 1
+        for key in self.__certainty:
+            if key != mode:
+                self.__certainty[key] = 0
+
+    def has_certain_mode(self):
+        for key in self.__certainty:
+            if self.__certainty[key] == 1:
+                return True
+        return False
