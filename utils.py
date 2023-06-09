@@ -32,7 +32,7 @@ class Color:
 
 
 def calculate_color(amt):
-    if amt <= .3:
+    if amt <= .03:
         return Color.RED
     if amt <= .6:
         return Color.YELLOW

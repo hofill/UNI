@@ -24,6 +24,8 @@ class BCState:
         self.__provides_iv = None
         self.__past_combos = []
 
+        self.__repeats_iv = False
+
     def initialize_no_server(self):
         self.__block_size = 16
         self.__padding_method = 'PKCS7'
@@ -37,18 +39,32 @@ class BCState:
         :return: True if the block cipher mode is determined
         """
         self.__past_combos.append((ciphertext, plaintext))
-        if self.__category == "ECB_CBC":
-            self.check_category_block(ciphertext)
-            if self.__certainty.has_certain_mode():
-                return True
-        elif self.__category == "Stream":
-            self.check_category_steam(ciphertext, plaintext)
-            if self.__certainty.has_certain_mode():
-                return True
-        elif self.__category is None:
-            raise CategoryNotDeterminedException("Category not determined")
-        else:
-            self.__certainty.certain(self.__category)
+        if not self.__certainty.has_certainties():
+            if self.__category == "ECB_CBC":
+                self.check_category_block(ciphertext)
+                if self.__certainty.has_certain_mode():
+                    return True
+            elif self.__category == "Stream":
+                self.check_category_steam(ciphertext, plaintext)
+                if self.__certainty.has_certain_mode():
+                    return True
+            elif self.__category is None:
+                raise CategoryNotDeterminedException("Category not determined")
+            else:
+                self.__certainty.certain(self.__category)
+
+        # Test same IV
+        self.__repeats_iv = self.check_repeat_iv()
+
+    def check_repeat_iv(self):
+        # Get two identical stored plaintexts
+        for i in range(len(self.__past_combos)):
+            for j in range(len(self.__past_combos)):
+                if i == j:
+                    continue
+                if self.__past_combos[i] == self.__past_combos[j]:
+                    return True
+        return False
 
     def check_category_block(self, ciphertext):
         """
@@ -234,3 +250,6 @@ class BCState:
 
     def get_certainty(self):
         return self.__certainty
+
+    def get_reuse_iv(self):
+        return self.__repeats_iv

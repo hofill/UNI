@@ -1,4 +1,5 @@
 from BCState import BCState
+from Logger import Logger
 from exceptions import *
 
 
@@ -11,18 +12,17 @@ class BCDetector:
     method should return a process object that is used to communicate with the server,
     which will be passed to the encrypt and decrypt method.
 
-    :param max_retries: The maximum number of times to retry an operation
     :param save_to_file: Whether to save the results to a file
     :param server: Whether to use a server to decrypt the data
     """
 
     def __init__(self, **kwargs):
-        self.max_retries = int(kwargs.get('max_retries', 3))
         self.save_to_file = bool(kwargs.get('save_to_file', False))
         self.server = bool(kwargs.get('server', False))
         self.__attempts = 0
         self.__history = []
         self.__state = BCState()
+        self.__logger = Logger(log_to_file=self.save_to_file)
         if not self.server:
             self.__state.initialize_no_server()
 
@@ -116,15 +116,6 @@ class BCDetector:
 
         :return: The padding method, None if not found/not applicable
         """
-        # Get Category
-        category = self.__state.get_block_cipher_mode_category()
-
-        # Get Block Cipher Mode
-        block_cipher_mode = self.__state.get_block_cipher_mode()
-
-        # Get Block Size
-        block_size = self.__state.get_block_size()
-
         if not self.__state.check_padding_method_determinable(self.encrypt, self.__server_instance):
             return None
 
@@ -141,33 +132,41 @@ class BCDetector:
 
         :return: None
         """
-        print(f"[INFO] Starting initial cryptanalysis.")
-        print(f"[INFO] Determining block size.")
+        self.__logger.log("Starting initial cryptanalysis.")
+        self.__logger.log("Determining block size.")
         try:
-            print(f"[X] Found block size: {self.check_block_size()}.")
+            self.__logger.log(f"Found block size: {self.check_block_size()}.", "X")
         except BlockSizeUnidentifiableException as e:
-            print(f"[ERROR] Could not determine block size: {e}.")
+            self.__logger.log(f"Could not determine block size: {e}.", "ERROR")
             return
-        print(f"[INFO] Determining block cipher category.")
+        self.__logger.log("Determining block cipher category.")
         if self.__state.get_block_cipher_mode_category():
-            print(f"[X] Found block cipher category: {self.__state.get_block_cipher_mode_category()}.")
+            self.__logger.log(f"Found block cipher category: {self.__state.get_block_cipher_mode_category()}.", "X")
         else:
-            print(f"[ERROR] Could not determine block cipher category.")
+            self.__logger.log("Could not determine block cipher category.", "ERROR")
             return
-        print(f"[INFO] Starting fingerprinting.")
-        print(f"[INFO] Determining block cipher mode.")
+        self.__logger.log("Starting fingerprinting.")
+        self.__logger.log("Determining block cipher mode.")
         detected = self.check_block_cipher_mode()
         if detected:
-            print(f"[X] Found block cipher mode: {detected}.")
+            self.__logger.log(f"Found block cipher mode: {detected}.", "X")
         else:
-            print(f"[INFO] Could not determine block cipher mode, providing a list of probable modes.")
-        self.__state.get_certainty().print_certainty()
+            self.__logger.log("Could not determine block cipher mode, providing a list of probable modes.")
+        self.__state.get_certainty().print_certainty(self.__logger)
         if not (detected == "ECB" or detected == "CBC"):
-            print(f"[INFO] Block cipher mode is not ECB or CBC, skipping padding method detection.")
-            return
-        print(f"[INFO] ECB/CBC detected. Determining padding method.")
-        detected = self.check_padding_method()
-        if detected:
-            print(f"[X] Found padding method: {detected}.")
+            self.__logger.log("Block cipher mode is not ECB or CBC, skipping padding method detection.")
         else:
-            print(f"[INFO] Could not determine padding method.")
+            self.__logger.log("ECB/CBC detected. Determining padding method.")
+            detected = self.check_padding_method()
+            if detected:
+                self.__logger.log(f"Found padding method: {detected}.", "X")
+            else:
+                self.__logger.log("Could not determine padding method.")
+        if not self.__state.get_block_cipher_mode() == "ECB":
+            self.__logger.log("Checking if the IV is reused for each encryption.")
+            first = self.encrypt(b'A'.hex(), self.__server_instance)
+            second = self.encrypt(b'A'.hex(), self.__server_instance)
+            self.__state.add_combo(bytes.fromhex(first), b'A')
+            self.__state.add_combo(bytes.fromhex(second), b'A')
+            self.__logger.log(f"Reuses IV: {self.__state.get_reuse_iv()}.")
+        self.__logger.log("Fingerprinting complete.")

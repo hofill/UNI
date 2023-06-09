@@ -1,14 +1,12 @@
 from BCDetector import BCDetector
 from pwn import *
 
-from exceptions import BadPaddingException
-
 context.log_level = 'critical'
 
 
 class Det(BCDetector):
     def __init__(self):
-        super().__init__(max_retries=3, save_to_file=True, server=True)
+        super().__init__(save_to_file=True, server=True)
 
     def encrypt(self, data, server: process):
         server.recvuntil(b"> ")
@@ -17,7 +15,7 @@ class Det(BCDetector):
         return server.readline().strip().split(b": ")[1].decode()
 
     def init_server(self):
-        return process(["./test_servers/ctr.py"])
+        return process(["./test_servers/ecb.py"])
 
 
 if __name__ == "__main__":

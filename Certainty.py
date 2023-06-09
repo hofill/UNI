@@ -24,13 +24,13 @@ class Certainty:
         if self.__certainty[bctype] == 1:
             return "Surely"
 
-    def print_certainty(self):
+    def print_certainty(self, logger):
         sorted_certainties = {k: v for k, v in sorted(self.__certainty.items(), reverse=True, key=lambda item: item[1])}
-        print(f"{utils.Color.BOLD + utils.Color.BLUE}======= Probabilities ======={utils.Color.END}")
+        logger.log_simple(f"{utils.Color.BOLD + utils.Color.BLUE}======= Probabilities ======={utils.Color.END}")
         for block_cipher_mode, percentage in sorted_certainties.items():
-
-            print(f"{utils.calculate_color(percentage)}{block_cipher_mode}{utils.Color.END}: {round(percentage * 100, 3)}%")
-        print(f"{utils.Color.BOLD + utils.Color.BLUE}============================={utils.Color.END}")
+            logger.log_simple(
+                f"{utils.calculate_color(percentage)}{block_cipher_mode}{utils.Color.END}: {round(percentage * 100, 3)}%")
+        logger.log_simple(f"{utils.Color.BOLD + utils.Color.BLUE}============================={utils.Color.END}")
 
     def get_certainty(self):
         return self.__certainty
@@ -70,5 +70,11 @@ class Certainty:
     def has_certain_mode(self):
         for key in self.__certainty:
             if self.__certainty[key] == 1:
+                return True
+        return False
+
+    def has_certainties(self):
+        for key in self.__certainty:
+            if self.__certainty[key] > 0:
                 return True
         return False
