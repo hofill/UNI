@@ -78,3 +78,6 @@ class Certainty:
             if self.__certainty[key] > 0:
                 return True
         return False
+
+    def get_most_certain(self):
+        return max(self.__certainty, key=self.__certainty.get)

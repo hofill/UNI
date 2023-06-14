@@ -45,15 +45,73 @@ class BCState:
                 if self.__certainty.has_certain_mode():
                     return True
             elif self.__category == "Stream":
-                self.check_category_steam(ciphertext, plaintext)
+                self.check_category_stream(ciphertext, plaintext)
                 if self.__certainty.has_certain_mode():
                     return True
             elif self.__category is None:
-                raise CategoryNotDeterminedException("Category not determined")
+                self.check_category_block(ciphertext)
+                if plaintext is not None:
+                    self.check_category_stream(ciphertext, plaintext)
             else:
                 self.__certainty.certain(self.__category)
 
         # Test same IV
+        self.__repeats_iv = self.check_repeat_iv()
+
+    def add_combo_simple(self, ciphertext: bytes, plaintext: bytes):
+        self.__past_combos.append((ciphertext, plaintext))
+
+        if not self.__certainty.has_certain_mode():
+            # Check if the ciphertext is a multiple of the block size
+            if len(ciphertext) % self.__block_size != 0:
+                self.__category = "Stream"
+                if len(plaintext) + 16 == len(ciphertext):
+                    probabilities = {
+                        "ECB": 0,
+                        "CBC": 0,
+                        "CFB": 90,
+                        "OFB": 90,
+                        "CTR": 10,
+                    }
+                else:
+                    probabilities = {
+                        "ECB": 0,
+                        "CBC": 0,
+                        "CFB": 10,
+                        "OFB": 10,
+                        "CTR": 90,
+                    }
+                self.__certainty.normalize(probabilities)
+                return True
+            # Check ECB
+            has_identical_blocks = self.check_identical_blocks(ciphertext)
+            if has_identical_blocks:
+                self.__certainty.certain("ECB")
+                self.__detected_block_cipher_mode = "ECB"
+                return True
+
+            # Check CBC
+            # Check if plaintext has two identical blocks
+            if plaintext is not None:
+                print(plaintext)
+                has_identical_blocks_pt = self.check_identical_blocks(plaintext)
+                print(has_identical_blocks_pt)
+                has_identical_blocks_ct = self.check_identical_blocks(ciphertext)
+                if has_identical_blocks_pt and not has_identical_blocks_ct:
+                    self.__certainty.certain("CBC")
+                    self.__detected_block_cipher_mode = "CBC"
+                    return True
+
+            probabilities = {
+                "ECB": 100,
+                "CBC": 100,
+                "CFB": 10,
+                "OFB": 10,
+                "CTR": 10,
+            }
+            self.__certainty.normalize(probabilities)
+
+        # Test repeated IV
         self.__repeats_iv = self.check_repeat_iv()
 
     def check_repeat_iv(self):
@@ -81,7 +139,7 @@ class BCState:
             self.__certainty.certain("CBC")
             self.__detected_block_cipher_mode = "CBC"
 
-    def check_category_steam(self, ciphertext: bytes, plaintext: bytes):
+    def check_category_stream(self, ciphertext: bytes, plaintext: bytes):
         """
         Determines the block ciphers modes of operation by checking aspects specific to stream ciphers like CFB, OFB and CTR
 
@@ -138,9 +196,6 @@ class BCState:
             if ciphertext.count(block) > 1:
                 return True
         return False
-
-    def add_combo_no_plaintext(self, ciphertext: bytes):
-        pass
 
     def add_block_size_check(self, plaintext_length, ciphertext):
         """

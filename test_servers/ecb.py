@@ -17,7 +17,9 @@ def common_pad(pt, block_size):
 
 def encrypt_data():
     aes = AES.new(KEY, AES.MODE_ECB)
-    data = common_pad(bytes.fromhex(input("Data (HEX): ").strip()), BLOCK_SIZE)
+    data = b'random..' + bytes.fromhex(input(
+        "Data (HEX): ").strip()) + b'confidential'
+    data = pad(data, BLOCK_SIZE)
     encrypted = aes.encrypt(data)
     print(encrypted.hex())
 
@@ -29,7 +31,6 @@ def decrypt_data():
 
 
 if __name__ == "__main__":
-
     functions = {
         "1": encrypt_data,
         "2": decrypt_data

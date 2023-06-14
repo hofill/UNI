@@ -1,5 +1,8 @@
 from BCState import BCState
 from Logger import Logger
+from attacks.Attack import Attack
+from attacks.ChosenPlaintext import ChosenPlaintextAttack
+from attacks.PaddingOracle import PaddingOracleAttack
 from exceptions import *
 
 
@@ -19,14 +22,12 @@ class BCDetector:
     def __init__(self, **kwargs):
         self.save_to_file = bool(kwargs.get('save_to_file', False))
         self.server = bool(kwargs.get('server', False))
-        self.__attempts = 0
         self.__history = []
         self.__state = BCState()
         self.__logger = Logger(log_to_file=self.save_to_file)
         if not self.server:
             self.__state.initialize_no_server()
 
-        self.__padding_method = None  # "Block", "Block+", "No Padding"
         self.__server_instance = None
 
     def encrypt(self, data, server):
@@ -36,6 +37,16 @@ class BCDetector:
         :param data: The data to encrypt, as hex
         :param server: The server to use
         :return: The encrypted data as bytes
+        """
+        raise NotImplementedError
+
+    def decrypt(self, data, server):
+        """
+        Unimplemented method that should decrypt the data using the server.
+
+        :param data: The data to decrypt, as hex
+        :param server: The server to use
+        :return: The decrypted data as bytes
         """
         raise NotImplementedError
 
@@ -170,3 +181,24 @@ class BCDetector:
             self.__state.add_combo(bytes.fromhex(second), b'A')
             self.__logger.log(f"Reuses IV: {self.__state.get_reuse_iv()}.")
         self.__logger.log("Fingerprinting complete.")
+        most_probable = self.__state.get_certainty().get_most_certain()
+        if most_probable == "ECB":
+            attack = ChosenPlaintextAttack(self.encrypt, self.decrypt, self.__state.get_block_size(), self.__server_instance)
+            attack_string = "Chosen Plaintext Attack"
+        else:
+            attack = PaddingOracleAttack(self.encrypt, self.decrypt)
+            attack_string = "Padding Oracle Attack"
+
+        answer = input(f"Would you like to perform a {attack_string}? (Y/n) ")
+        if answer.lower() == "y" or not answer:
+            self.__logger.log(f"Starting {attack_string}.")
+            attack.run()
+            self.__logger.log(f"{attack_string} complete.")
+        else:
+            self.__logger.log("Skipping attack.")
+
+    def analyze_string(self, ciphertext, plaintext=None):
+        self.__state.add_combo_simple(bytes.fromhex(ciphertext), plaintext)
+
+    def print_certainty(self):
+        return self.__state.get_certainty().print_certainty(self.__logger)
