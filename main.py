@@ -13,11 +13,12 @@ class Det(BCDetector):
     def decrypt(self, data, server: process):
         server.recvuntil(b"> ")
         server.sendline(b"2")
+        server.recvuntil(b": ")
         server.sendline(data.encode())
         response = server.readline().strip()
-        if response == b"Invalid padding":
+        if response == b"Padding is incorrect.":
             raise BadPaddingException
-        return response.split(b": ")[1].decode()
+        return response.decode()
 
     def encrypt(self, data, server: process):
         server.recvuntil(b"> ")
@@ -26,7 +27,7 @@ class Det(BCDetector):
         return server.readline().strip().split(b": ")[1].decode()
 
     def init_server(self):
-        return process(["./test_servers/ecb.py"])
+        return process(["./test_servers/cbc.py"])
 
 
 if __name__ == "__main__":

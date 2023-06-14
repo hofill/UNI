@@ -40,3 +40,15 @@ def calculate_color(amt):
         return Color.GREEN
     else:
         return Color.GREEN + Color.BOLD
+
+
+def replace_block_number(ciphertext, number, other_block, block_size):
+    return ciphertext[:number * block_size] + other_block + ciphertext[(number + 1) * block_size:]
+
+
+def get_block_number(ciphertext, number, block_size):
+    return ciphertext[number * block_size:(number + 1) * block_size]
+
+
+def xor(a, b):
+    return bytes([x ^ y for x, y in zip(a, b)])

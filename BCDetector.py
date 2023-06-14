@@ -186,7 +186,7 @@ class BCDetector:
             attack = ChosenPlaintextAttack(self.encrypt, self.decrypt, self.__state.get_block_size(), self.__server_instance)
             attack_string = "Chosen Plaintext Attack"
         else:
-            attack = PaddingOracleAttack(self.encrypt, self.decrypt)
+            attack = PaddingOracleAttack(self.encrypt, self.decrypt, self.__state.get_block_size(), self.__server_instance)
             attack_string = "Padding Oracle Attack"
 
         answer = input(f"Would you like to perform a {attack_string}? (Y/n) ")
