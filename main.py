@@ -27,7 +27,7 @@ class Det(BCDetector):
         return server.readline().strip().split(b": ")[1].decode()
 
     def init_server(self):
-        return process(["./test_servers/cbc.py"])
+        return process(["./test_servers/ecb.py"])
 
 
 if __name__ == "__main__":
